@@ -1,0 +1,540 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAM-OSINT - Advanced Security Orchestration Platform</title>
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/vis-network.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.css" rel="stylesheet" type="text/css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #0f0;
+            overflow-x: hidden;
+        }
+
+        /* Matrix Rain Animation */
+        #matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.3;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Main Container */
+        .container {
+            position: relative;
+            z-index: 1;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 20px;
+            border-bottom: 2px solid #0f0;
+            margin-bottom: 30px;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from {
+                text-shadow: 0 0 5px #0f0;
+            }
+            to {
+                text-shadow: 0 0 20px #0f0;
+            }
+        }
+
+        .header h1 {
+            font-size: 48px;
+            letter-spacing: 5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            color: #0a0;
+        }
+
+        /* Search Section */
+        .search-section {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #0f0;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(5px);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        #target-input {
+            flex: 1;
+            background: #000;
+            border: 2px solid #0f0;
+            color: #0f0;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            border-radius: 5px;
+        }
+
+        #target-input:focus {
+            outline: none;
+            box-shadow: 0 0 10px #0f0;
+        }
+
+        .btn {
+            background: #000;
+            border: 2px solid #0f0;
+            color: #0f0;
+            padding: 15px 30px;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-radius: 5px;
+        }
+
+        .btn:hover {
+            background: #0f0;
+            color: #000;
+            box-shadow: 0 0 20px #0f0;
+        }
+
+        /* Terminal Section */
+        .terminal {
+            background: #000;
+            border: 1px solid #0f0;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .terminal-header {
+            background: #0f0;
+            color: #000;
+            padding: 10px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .terminal-content {
+            padding: 20px;
+            height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            border-left: 3px solid #0f0;
+            padding-left: 10px;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .log-success {
+            color: #0f0;
+        }
+
+        .log-error {
+            color: #f00;
+        }
+
+        .log-warning {
+            color: #ff0;
+        }
+
+        .log-info {
+            color: #0af;
+        }
+
+        /* Network Graph Section */
+        .graph-section {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #0f0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        #network {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #0f0;
+            border-radius: 5px;
+            background: #000;
+        }
+
+        /* Results Section */
+        .results-section {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #0f0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: none;
+        }
+
+        .vuln-card {
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid #0f0;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+
+        .risk-critical {
+            border-left: 5px solid #f00;
+        }
+
+        .risk-high {
+            border-left: 5px solid #f90;
+        }
+
+        .risk-medium {
+            border-left: 5px solid #ff0;
+        }
+
+        .risk-low {
+            border-left: 5px solid #0f0;
+        }
+
+        /* Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        /* Loading Animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #0f0;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="matrix-bg"></canvas>
+    
+    <div class="container">
+        <div class="header">
+            <h1>SAM-OSINT</h1>
+            <p>Security Orchestration, Automation & Response | FBI • CIA Standard</p>
+        </div>
+
+        <div class="search-section">
+            <div class="input-group">
+                <input type="text" id="target-input" placeholder="Enter target (domain, IP, URL, etc.)" />
+                <button class="btn" id="pentest-btn">🚀 START PENTEST</button>
+            </div>
+            <p style="font-size: 12px; color: #0a0;">Examples: example.com | 192.168.1.1 | https://target.com</p>
+        </div>
+
+        <div class="terminal">
+            <div class="terminal-header">
+                <span>⚡ SAM-OSINT TERMINAL [v2.0]</span>
+                <span>REAL-TIME MONITORING</span>
+            </div>
+            <div class="terminal-content" id="terminal-content">
+                <div class="log-entry log-info">[READY] SAM-OSINT initialized. Awaiting target...</div>
+            </div>
+        </div>
+
+        <div class="graph-section">
+            <h3>🌐 NETWORK FOOTPRINT</h3>
+            <div id="network"></div>
+            <div class="action-buttons">
+                <button class="btn" id="zoom-in">🔍 Zoom In</button>
+                <button class="btn" id="zoom-out">🔍 Zoom Out</button>
+                <button class="btn" id="fit-view">🎯 Fit to View</button>
+            </div>
+        </div>
+
+        <div class="results-section" id="results-section">
+            <h3>📊 VULNERABILITY ASSESSMENT REPORT</h3>
+            <div id="vulnerabilities"></div>
+            <div class="action-buttons">
+                <button class="btn" id="download-report">📄 Download PDF Report</button>
+                <button class="btn" id="download-db">💾 Download Database Dump</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Matrix Rain Animation
+        const canvas = document.getElementById('matrix-bg');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        const matrix = "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789@#$%^&*()*&^%+-/~{[|`]}";
+        const matrixArray = matrix.split("");
+        
+        const fontSize = 14;
+        const columns = canvas.width / fontSize;
+        
+        const drops = [];
+        for(let x = 0; x < columns; x++) {
+            drops[x] = 1;
+        }
+        
+        function drawMatrix() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.04)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#0f0';
+            ctx.font = fontSize + 'px monospace';
+            
+            for(let i = 0; i < drops.length; i++) {
+                const text = matrixArray[Math.floor(Math.random() * matrixArray.length)];
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                
+                if(drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+        
+        setInterval(drawMatrix, 35);
+        
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+        
+        // Socket.IO connection
+        const socket = io();
+        let currentTarget = null;
+        let network = null;
+        let networkData = null;
+        
+        // Add log message
+        function addLog(message, status = 'info') {
+            const terminal = document.getElementById('terminal-content');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${status}`;
+            logEntry.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            terminal.appendChild(logEntry);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+        
+        // Socket events
+        socket.on('connect', () => {
+            addLog('Connected to SAM-OSINT backend', 'success');
+        });
+        
+        socket.on('scan_log', (data) => {
+            addLog(data.message, data.status);
+        });
+        
+        socket.on('scan_complete', (data) => {
+            addLog(`Scan complete for ${data.target}! Fetching results...`, 'success');
+            fetchResults(data.target);
+        });
+        
+        // Fetch scan results
+        async function fetchResults(target) {
+            try {
+                const response = await fetch(`/api/results/${target}`);
+                const results = await response.json();
+                displayResults(results);
+                updateNetworkGraph(results.network_footprint);
+            } catch (error) {
+                addLog(`Error fetching results: ${error}`, 'error');
+            }
+        }
+        
+        // Display results
+        function displayResults(results) {
+            const section = document.getElementById('results-section');
+            const vulnDiv = document.getElementById('vulnerabilities');
+            
+            section.style.display = 'block';
+            
+            let html = '<h4>Vulnerabilities Found:</h4>';
+            
+            results.vulnerabilities.forEach((vuln, index) => {
+                const riskClass = `risk-${vuln.risk?.toLowerCase() || 'low'}`;
+                html += `
+                    <div class="vuln-card ${riskClass}">
+                        <strong>${vuln.type || 'Unknown'}</strong> - Risk: ${vuln.risk || 'Unknown'}<br>
+                        <small>Location: ${vuln.location || vuln.url || 'N/A'}</small><br>
+                        <small>Description: ${vuln.description || vuln.evidence || 'No description'}</small>
+                    </div>
+                `;
+            });
+            
+            vulnDiv.innerHTML = html;
+            
+            // Setup download buttons
+            document.getElementById('download-report').onclick = () => {
+                window.location.href = `/api/download_report/${results.target}`;
+            };
+        }
+        
+        // Update network graph
+        function updateNetworkGraph(graphData) {
+            if (!graphData || !graphData.nodes) return;
+            
+            const nodes = new vis.DataSet(graphData.nodes.map(node => ({
+                id: node.id,
+                label: node.id,
+                title: `Type: ${node.type}`,
+                size: node.size || 20,
+                color: node.color || '#0f0'
+            })));
+            
+            const edges = new vis.DataSet(graphData.edges.map(edge => ({
+                from: edge.from,
+                to: edge.to,
+                label: edge.relationship || 'connected',
+                arrows: 'to'
+            })));
+            
+            const container = document.getElementById('network');
+            const data = { nodes, edges };
+            const options = {
+                nodes: {
+                    shape: 'dot',
+                    font: {
+                        color: '#0f0',
+                        size: 12,
+                        face: 'monospace'
+                    }
+                },
+                edges: {
+                    color: '#0f0',
+                    font: {
+                        color: '#0f0',
+                        size: 10
+                    },
+                    smooth: {
+                        type: 'continuous'
+                    }
+                },
+                physics: {
+                    enabled: true,
+                    stabilization: true
+                },
+                interaction: {
+                    hover: true,
+                    zoomView: true,
+                    dragView: true
+                }
+            };
+            
+            network = new vis.Network(container, data, options);
+            networkData = { nodes, edges };
+            
+            // Zoom controls
+            document.getElementById('zoom-in').onclick = () => {
+                const scale = network.getScale();
+                network.moveTo({ scale: scale * 1.2 });
+            };
+            
+            document.getElementById('zoom-out').onclick = () => {
+                const scale = network.getScale();
+                network.moveTo({ scale: scale / 1.2 });
+            };
+            
+            document.getElementById('fit-view').onclick = () => {
+                network.fit();
+            };
+        }
+        
+        // Start pentest
+        document.getElementById('pentest-btn').onclick = async () => {
+            const target = document.getElementById('target-input').value.trim();
+            if (!target) {
+                addLog('Please enter a target', 'error');
+                return;
+            }
+            
+            currentTarget = target;
+            addLog(`Initiating pentest on ${target}...`, 'info');
+            addLog('This may take several minutes. Please wait...', 'warning');
+            
+            try {
+                const response = await fetch('/api/scan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ target })
+                });
+                
+                const data = await response.json();
+                if (data.status === 'Scan started') {
+                    addLog(`Scan started successfully for ${target}`, 'success');
+                } else {
+                    addLog(`Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                addLog(`Error starting scan: ${error}`, 'error');
+            }
+        };
+        
+        // Initial network graph setup
+        const initialGraph = {
+            nodes: [{ id: 'SAM-OSINT', label: 'SAM-OSINT', type: 'system', size: 30, color: '#0f0' }],
+            edges: []
+        };
+        updateNetworkGraph(initialGraph);
+        
+        addLog('SAM-OSINT ready. Enter a target to begin penetration testing.', 'success');
+    </script>
+</body>
+</html>
